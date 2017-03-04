@@ -4,9 +4,9 @@ from PIL import Image, ImageDraw, ImageFont, ImageTk
 from multiprocessing import Process
 import time
 import socket
-from ui_prototype import GuiActions
 import logging
 import configparser
+from gui_actions import GuiActions
 from enum import Enum
 
 SCREEN_WIDTH = 128
@@ -28,7 +28,7 @@ class Controller(Process):
 
         self.get_logger()
         self.pipe = pipe
-        self.screens = [WeightInputScreen(), IpAddressScreen(), WatchScreen()]
+        self.screens = [WatchScreen(), WeightInputScreen(), IpAddressScreen()]
         self.update_frequency = 0.1
 
 
@@ -74,7 +74,7 @@ class Controller(Process):
 
     def get_current_screen(self):
         if not hasattr(self, "current_screen_index"):
-            self.current_screen_index = 0
+            self.current_screen_index = 1
 
         return self.screens[self.current_screen_index]
 
@@ -125,7 +125,10 @@ class WatchScreen(AbstractScreen):
     def create_image(self):
         im = Image.new('1', (SCREEN_WIDTH, SCREEN_HEIGHT), 128)
         draw = ImageDraw.Draw(im)
-        fnt = ImageFont.truetype("arial.ttf", 14)
+        #fnt = ImageFont.truetype("arial.ttf", 14)
+        #fnt = ImageFont.truetype("arial.pil", 14)
+        fnt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+
         text = datetime.now().time().isoformat()
         self.logger.debug("time used in picture: %s" % text)
         draw.text((0, 0), text, font=fnt)
@@ -146,7 +149,7 @@ class IpAddressScreen(AbstractScreen):
         #im = Image.new('1', (SCREEN_WIDTH, SCREEN_HEIGHT), 128)
         im = Image.new('1', (SCREEN_WIDTH, SCREEN_HEIGHT), color = 0)
         draw = ImageDraw.Draw(im)
-        fnt = ImageFont.truetype("arial.ttf", 14)
+        fnt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
         ip_address = socket.gethostbyname(socket.gethostname())
 
         #draw.rectangle([(0,0),(50,50)], fill=0)
@@ -175,8 +178,12 @@ class WeightInputScreen(AbstractScreen):
         else:
             FG = 0
             BG = 1
-        small_fnt = ImageFont.truetype("arial.ttf", 14)
-        big_fnt = ImageFont.truetype("arial.ttf", 30)
+        #small_fnt = ImageFont.truetype("arial.pil", 14)
+        small_fnt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+
+        #big_fnt = ImageFont.truetype("arial.pil", 30)
+        big_fnt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+
 
         im = Image.new('1', (SCREEN_WIDTH, SCREEN_HEIGHT), color=BG)
         draw = ImageDraw.Draw(im)

@@ -1,25 +1,21 @@
 # !/usr/bin/python3
-import configparser
-import logging
-import logging.config
-from enum import Enum
-from functools import partial
-from multiprocessing import Pipe
 from tkinter import *
+from tkinter import messagebox
 from tkinter.ttk import *
+from multiprocessing import Pipe, Process
+from functools import partial
 
-from PIL import ImageTk
+import configparser
+import logging, logging.config
+import time 
+from PIL import Image, ImageTk
 
+from gui_actions import GuiActions
 import screens
 
+import Adafruit_GPIO.SPI as SPI
+import Adafruit_SSD1306
 
-class GuiActions(Enum):
-    LEFT_BUTTON = 1
-    LEFT = 2
-    ACTION = 3
-    RIGHT = 4
-    RIGHT_BUTTON = 5
-    EXIT_PROGRAM = 6
 
 
 class TkinterApp(object):
@@ -60,10 +56,8 @@ class TkinterApp(object):
         self.pipe.send(GuiActions.EXIT_PROGRAM)
         self.top.destroy()
 
-
     def button_callback(self, action):
         self.pipe.send(action)
-
 
     def check_pipe_poll(self):
         self.logger.debug("check_pipe_poll")
@@ -76,7 +70,38 @@ class TkinterApp(object):
             self.image_label.pack(side=TOP)
         self.top.after(100, self.check_pipe_poll)
 
+class Ssd1306App(Process):
+    def __init__(self, pipe):
+        super().__init__()    
+        self.logger = logging.getLogger("Ssd1306App")
+        self.pipe = pipe
+        # Raspberry Pi pin configuration:
+        self.RST = 24
+        # Note the following are only used with SPI:
+        self.DC = 23
+        self.SPI_PORT = 0
+        self.SPI_DEVICE = 0
+        # 128x64 display with hardware SPI:
+        self.disp = Adafruit_SSD1306.SSD1306_128_64(rst=self.RST, dc=self.DC, spi=SPI.SpiDev(self.SPI_PORT, self.SPI_DEVICE, max_speed_hz=8000000))
 
+        # Initialize library.
+        self.disp.begin()
+        # Clear display.
+        self.disp.clear()
+        self.disp.display()
+
+        self.update_frequency = 0.1
+        
+    def run(self):
+        self.logger.debug("check_pipe_poll")
+
+        while True:
+            if self.pipe.poll():
+                pil_image = self.pipe.recv()
+                self.disp.image(pil_image)
+                self.disp.display()
+            time.sleep(self.update_frequency)
+            
 if __name__ == '__main__':
     config = configparser.ConfigParser()
     config.read(r"config.ini")
@@ -88,9 +113,11 @@ if __name__ == '__main__':
 
     parent_conn, child_conn = Pipe()
     controller_process = screens.Controller(child_conn)
-    tkinter_app = TkinterApp(parent_conn)
-
+    #tkinter_app = TkinterApp(parent_conn)
+    ssd1306_app = Ssd1306App(parent_conn)
+    ssd1306_app.start()
     controller_process.start()
-    tkinter_app.top.mainloop()
-    controller_process.join()
 
+    #tkinter_app.top.mainloop()
+    controller_process.join()
+    ssd1306_app.join()
