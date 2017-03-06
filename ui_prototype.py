@@ -13,10 +13,6 @@ from PIL import Image, ImageTk
 from gui_actions import GuiActions
 import screens
 
-import Adafruit_GPIO.SPI as SPI
-import Adafruit_SSD1306
-
-
 
 class TkinterApp(object):
     def __init__(self, pipe):
@@ -113,11 +109,18 @@ if __name__ == '__main__':
 
     parent_conn, child_conn = Pipe()
     controller_process = screens.Controller(child_conn)
-    #tkinter_app = TkinterApp(parent_conn)
-    ssd1306_app = Ssd1306App(parent_conn)
-    ssd1306_app.start()
-    controller_process.start()
 
-    #tkinter_app.top.mainloop()
-    controller_process.join()
-    ssd1306_app.join()
+    frontend = config['WeightlossGadget']['frontend']
+    if frontend == 'TkInter':
+        tkinter_app = TkinterApp(parent_conn)
+        controller_process.start()
+        tkinter_app.top.mainloop()
+        controller_process.join()
+    elif frontend == 'Ssd1306':
+        import Adafruit_GPIO.SPI as SPI
+        import Adafruit_SSD1306
+        ssd1306_app = Ssd1306App(parent_conn)
+        ssd1306_app.start()
+        controller_process.start()
+        controller_process.join()
+        ssd1306_app.join()

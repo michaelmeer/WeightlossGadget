@@ -15,6 +15,8 @@ SCREEN_HEIGHT = 64
 Fill 0 -> black, 1 -> white
 """
 
+fnt = ImageFont.truetype(r'resources\Roboto-Bold.ttf', 14)
+
 class Color(Enum):
     BLACK = 0
     WHITE = 1
@@ -30,7 +32,6 @@ class Controller(Process):
         self.pipe = pipe
         self.screens = [WatchScreen(), WeightInputScreen(), IpAddressScreen()]
         self.update_frequency = 0.1
-
 
         self.logger.info("Controller initialized")
 
@@ -125,13 +126,14 @@ class WatchScreen(AbstractScreen):
     def create_image(self):
         im = Image.new('1', (SCREEN_WIDTH, SCREEN_HEIGHT), 128)
         draw = ImageDraw.Draw(im)
-        #fnt = ImageFont.truetype("arial.ttf", 14)
-        #fnt = ImageFont.truetype("arial.pil", 14)
-        fnt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
 
-        text = datetime.now().time().isoformat()
-        self.logger.debug("time used in picture: %s" % text)
-        draw.text((0, 0), text, font=fnt)
+        now = datetime.now()
+        time_text = now.time().isoformat()
+        date_text = now.date().strftime('%Y-%m-%d')
+        self.logger.debug("time used in picture: %s" % time_text)
+        draw.text((0, 0), time_text, font=fnt)
+        draw.text((0, 30), date_text, font=fnt)
+
         del draw
         return im
 
@@ -146,14 +148,10 @@ class IpAddressScreen(AbstractScreen):
         return self.counter <= 1
 
     def create_image(self):
-        #im = Image.new('1', (SCREEN_WIDTH, SCREEN_HEIGHT), 128)
         im = Image.new('1', (SCREEN_WIDTH, SCREEN_HEIGHT), color = 0)
         draw = ImageDraw.Draw(im)
-        fnt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
         ip_address = socket.gethostbyname(socket.gethostname())
 
-        #draw.rectangle([(0,0),(50,50)], fill=0)
-        #draw.rectangle([(10, 10), (40, 40)], fill=1)
         draw.text((0, 0), ip_address, font=fnt, fill=1)
         del draw
         return im
@@ -178,23 +176,17 @@ class WeightInputScreen(AbstractScreen):
         else:
             FG = 0
             BG = 1
-        #small_fnt = ImageFont.truetype("arial.pil", 14)
-        small_fnt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
-
-        #big_fnt = ImageFont.truetype("arial.pil", 30)
-        big_fnt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
-
 
         im = Image.new('1', (SCREEN_WIDTH, SCREEN_HEIGHT), color=BG)
         draw = ImageDraw.Draw(im)
 
-        draw.text((0, 0), self.name, font=small_fnt, fill=FG)
+        draw.text((0, 0), self.name, font=fnt, fill=FG)
         weight_str ="%5.1f"%self.current_weight
         self.logger.debug("Counter: %i", self.counter)
         if self.input_mode and self.counter%3 == 0:
             weight_str = weight_str[:-1]+' '
 
-        draw.text((30, 20), weight_str, font=big_fnt, fill=FG)
+        draw.text((30, 20), weight_str, font=fnt, fill=FG)
         del draw
         return im
 
