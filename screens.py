@@ -8,6 +8,7 @@ import logging
 import configparser
 from gui_actions import GuiActions
 from enum import Enum
+import google_sheets_interface
 
 SCREEN_WIDTH = 128
 SCREEN_HEIGHT = 64
@@ -20,6 +21,13 @@ fnt = ImageFont.truetype(r'resources\Roboto-Bold.ttf', 14)
 class Color(Enum):
     BLACK = 0
     WHITE = 1
+
+interface = google_sheets_interface.GoogleSheetsInterface(
+    client_secret_file=r'C:\Users\michael.meer\PycharmProjects\WeightlossGadget\client_secret_1082141044520-n0cg7u76fd8pvvagh929o91538u1val1.apps.googleusercontent.com.json',
+    application_name='dailycalories',
+    sheet_id='1VHbeWIq21ib7MndwwCHRon52of1MI4z9RVproZ_kpCk'
+)
+
 
 class Controller(Process):
     def __init__(self, pipe):
@@ -165,6 +173,9 @@ class WeightInputScreen(AbstractScreen):
         self.counter = 0
         self.input_mode = False
 
+        current_weight_row = interface.read_last_saved_weight()
+        self.current_weight = current_weight_row['Weight in kg']
+
     def does_need_update(self):
         self.counter += 1
         return self.counter % 2 == 0
@@ -201,6 +212,7 @@ class WeightInputScreen(AbstractScreen):
 
     def handle_input(self, input):
         if input.value == GuiActions.ACTION.value:
+            interface.write_weight(self.current_weight)
             self.set_input_mode(False)
         elif input.value == GuiActions.LEFT.value:
             self.current_weight += -0.1

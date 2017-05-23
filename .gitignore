@@ -87,3 +87,6 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# Google Sheets secrets file
+client_secret_*.apps.googleusercontent.com.json

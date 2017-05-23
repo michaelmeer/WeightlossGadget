@@ -12,7 +12,7 @@ from PIL import Image, ImageTk
 
 from gui_actions import GuiActions
 import screens
-
+import google_sheets_interface
 
 class TkinterApp(object):
     def __init__(self, pipe):
@@ -108,6 +108,7 @@ if __name__ == '__main__':
     logger.info("Loaded Logging Configuration")
 
     parent_conn, child_conn = Pipe()
+
     controller_process = screens.Controller(child_conn)
 
     frontend = config['WeightlossGadget']['frontend']
