@@ -8,7 +8,10 @@ import logging
 import configparser
 from gui_actions import GuiActions
 from enum import Enum
-import google_sheets_interface
+#import google_sheets_interface
+import socket
+import fcntl
+import struct
 
 SCREEN_WIDTH = 128
 SCREEN_HEIGHT = 64
@@ -16,18 +19,19 @@ SCREEN_HEIGHT = 64
 Fill 0 -> black, 1 -> white
 """
 
-fnt = ImageFont.truetype(r'resources\Roboto-Bold.ttf', 14)
+fnt = ImageFont.truetype(r'resources/Roboto-Bold.ttf', 14)
+#fnt = ImageFont.truetype(r'resources/RobotoCondensed-Bold.ttf', 14)
+
 
 class Color(Enum):
     BLACK = 0
     WHITE = 1
 
-interface = google_sheets_interface.GoogleSheetsInterface(
-    client_secret_file=r'C:\Users\michael.meer\PycharmProjects\WeightlossGadget\client_secret_1082141044520-n0cg7u76fd8pvvagh929o91538u1val1.apps.googleusercontent.com.json',
-    application_name='dailycalories',
-    sheet_id='1VHbeWIq21ib7MndwwCHRon52of1MI4z9RVproZ_kpCk'
-)
-
+#interface = google_sheets_interface.GoogleSheetsInterface(
+#    client_secret_file=r'C:\Users\michael.meer\PycharmProjects\WeightlossGadget\client_secret_1082141044520-n0cg7u76fd8pvvagh929o91538u1val1.apps.googleusercontent.com.json',
+#    application_name='dailycalories',
+#    sheet_id='1VHbeWIq21ib7MndwwCHRon52of1MI4z9RVproZ_kpCk'
+#)
 
 class Controller(Process):
     def __init__(self, pipe):
@@ -38,7 +42,8 @@ class Controller(Process):
 
         self.get_logger()
         self.pipe = pipe
-        self.screens = [WatchScreen(), WeightInputScreen(), IpAddressScreen()]
+        #self.screens = [WatchScreen(), WeightInputScreen(), IpAddressScreen()]
+        self.screens = [WatchScreen(), IpAddressScreen()]
         self.update_frequency = 0.1
 
         self.logger.info("Controller initialized")
@@ -135,13 +140,15 @@ class WatchScreen(AbstractScreen):
         im = Image.new('1', (SCREEN_WIDTH, SCREEN_HEIGHT), 128)
         draw = ImageDraw.Draw(im)
 
-        now = datetime.now()
-        time_text = now.time().isoformat()
-        date_text = now.date().strftime('%Y-%m-%d')
-        self.logger.debug("time used in picture: %s" % time_text)
-        draw.text((0, 0), time_text, font=fnt)
-        draw.text((0, 30), date_text, font=fnt)
+        t = time.localtime()
+        time_text = time.strftime("%H:%M:%S", t)
+        weekday_text = time.strftime("%A", t)
+        date_text = time.strftime('%Y-%m-%d', t)
 
+        draw.text((0, 0), time_text, font=fnt)
+        draw.text((0, 18), weekday_text, font=fnt)
+        draw.text((0, 36), date_text, font=fnt)
+        self.logger.debug("time used in picture: %s" % time_text)
         del draw
         return im
 
@@ -150,7 +157,7 @@ class IpAddressScreen(AbstractScreen):
         super().__init__()
         self.update_frequency = 0.5
         self.counter = 0
-
+       
     def does_need_update(self):
         self.counter += 1
         return self.counter <= 1
@@ -159,8 +166,10 @@ class IpAddressScreen(AbstractScreen):
         im = Image.new('1', (SCREEN_WIDTH, SCREEN_HEIGHT), color = 0)
         draw = ImageDraw.Draw(im)
         ip_address = socket.gethostbyname(socket.gethostname())
-
+        hostname = socket.gethostname()
         draw.text((0, 0), ip_address, font=fnt, fill=1)
+        draw.text((0, 20), hostname, font=fnt, fill=1)
+
         del draw
         return im
 

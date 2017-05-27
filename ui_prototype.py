@@ -1,4 +1,5 @@
-# !/usr/bin/python3
+#!/usr/bin/python3
+
 from tkinter import *
 from tkinter import messagebox
 from tkinter.ttk import *
@@ -68,6 +69,7 @@ class TkinterApp(object):
 
 class Ssd1306App(Process):
     def __init__(self, pipe):
+        ### DISPLAY PART ###
         super().__init__()    
         self.logger = logging.getLogger("Ssd1306App")
         self.pipe = pipe
@@ -87,6 +89,53 @@ class Ssd1306App(Process):
         self.disp.display()
 
         self.update_frequency = 0.1
+        
+        ### ROTARY ENCODER INPUT ###
+        GPIO.setwarnings(True)
+        GPIO.setmode(GPIO.BCM)        
+
+        self.Enc_A = 2             
+        self.Enc_B = 4             
+        self.Button = 3
+        
+        # Assume that rotary switch is not moving while we init software
+        self.Current_A = 1           
+        self.Current_B = 1
+
+        
+        # define the Encoder switch inputs
+        GPIO.setup(self.Enc_A, GPIO.IN, pull_up_down=GPIO.PUD_UP)             
+        GPIO.setup(self.Enc_B, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        
+        # setup callback thread for the A and B encoder 
+        # use interrupts for all inputs
+        GPIO.add_event_detect(self.Enc_A, GPIO.RISING, callback=self.rotary_interrupt)
+        GPIO.add_event_detect(self.Enc_B, GPIO.RISING, callback=self.rotary_interrupt)
+        
+        GPIO.setup(self.Button, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        GPIO.add_event_detect(self.Button, GPIO.FALLING, callback=self.button_interrupt)
+    
+    def button_interrupt(self, button):
+        self.logger.debug("Button pressed")
+        self.pipe.send(GuiActions.ACTION)
+        
+    def rotary_interrupt(self, A_or_B):
+        Switch_A = GPIO.input(self.Enc_A)
+        Switch_B = GPIO.input(self.Enc_B)
+
+        if self.Current_A == Switch_A and self.Current_B == Switch_B:
+            return
+
+        self.Current_A = Switch_A                        # remember new state
+        self.Current_B = Switch_B                        # for next bouncing check
+
+        if (Switch_A and Switch_B):
+          if A_or_B == self.Enc_B:                     # Turning direction depends on 
+            self.logger.debug("Rotary Encoder turns right")
+            self.pipe.send(GuiActions.RIGHT )
+          else:
+            self.logger.debug("Rotary Encoder turns left")
+            self.pipe.send(GuiActions.LEFT )
         
     def run(self):
         self.logger.debug("check_pipe_poll")
@@ -120,6 +169,8 @@ if __name__ == '__main__':
     elif frontend == 'Ssd1306':
         import Adafruit_GPIO.SPI as SPI
         import Adafruit_SSD1306
+        import RPi.GPIO as GPIO
+
         ssd1306_app = Ssd1306App(parent_conn)
         ssd1306_app.start()
         controller_process.start()
