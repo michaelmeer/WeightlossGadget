@@ -14,3 +14,12 @@ On separate screens:
 ** Loss last month
 * Chart of last 30 days
 * Chart of last year?
+
+To do for first version:
+- Make sure I can upload daily measurements and there's no issue when I have gaps in coverage
+- Make a picture, and annotate it with Name / Date / Weight
+
+Later:
+- Upload picture to Google Drive / Photos
+- Graph of Measurements
+- Use the Blinkt LEDs

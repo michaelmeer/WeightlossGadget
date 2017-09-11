@@ -1,0 +1,16 @@
+RGB LED calculations
+--------------------
+
+Used LEDs: microtivity IL611 5mm Diffused RGB Controllable LED, Common Cathode (Pack of 12)
+Brand Name	microtivity
+Color	rgb
+EAN	0721405250080
+Item Shape	Round
+Part Number	IL611
+UNSPSC Code	39101600
+UPC	721405250080
+
+Recommended current: <= 15mA per color
+Voltage drop: Blue and Green, 3.2V. Red, 2.0 V.
+
+Calculation results from http://ledcalculator.net/:

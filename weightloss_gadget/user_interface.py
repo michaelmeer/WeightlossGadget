@@ -1,19 +1,17 @@
 #!/usr/bin/python3
 
-from tkinter import *
-from tkinter import messagebox
-from tkinter.ttk import *
-from multiprocessing import Pipe, Process
+import logging
+import logging.config
+import time
 from functools import partial
-
-import configparser
-import logging, logging.config
-import time 
+from tkinter import *
+from tkinter.ttk import *
+from multiprocessing import Process, Pipe
 from PIL import Image, ImageTk
 
-from gui_actions import GuiActions
-import screens
-import google_sheets_interface
+from weightloss_gadget.gui_actions import GuiActions
+from weightloss_gadget.led_patterns import LedPatterns
+
 
 class TkinterApp(object):
     def __init__(self, pipe):
@@ -29,21 +27,34 @@ class TkinterApp(object):
         self.pipe = pipe
 
         leds_labelframe = LabelFrame(self.top, text = 'LEDs')
-        leds_labelframe.pack(fill = "both", expand = "yes", side = TOP)
-        led1 = Canvas(leds_labelframe, bg = "blue", height = 50, width = 50)
-        led1.pack()
+        leds_labelframe.pack(fill="both", expand="yes", side=TOP)
+        self.led1 = Canvas(leds_labelframe, bg = "blue", height = 50, width = 50)
+        self.led1.pack(side=LEFT)
+        self.led2 = Canvas(leds_labelframe, bg = "green", height = 50, width = 50)
+        self.led2.pack(side=LEFT)
+        self.led3 = Canvas(leds_labelframe, bg = "red", height = 50, width = 50)
+        self.led3.pack(side=LEFT)
+        self.led4 = Canvas(leds_labelframe, bg = "yellow", height = 50, width = 50)
+        self.led4.pack(side=LEFT)
+        self.led5 = Canvas(leds_labelframe, bg = "yellow", height = 50, width = 50)
+        self.led5.pack(side=LEFT)
+        self.led6 = Canvas(leds_labelframe, bg = "yellow", height = 50, width = 50)
+        self.led6.pack(side=LEFT)
+        self.led7 = Canvas(leds_labelframe, bg = "yellow", height = 50, width = 50)
+        self.led7.pack(side=LEFT)
+        self.led8 = Canvas(leds_labelframe, bg = "yellow", height = 50, width = 50)
+        self.led8.pack(side=LEFT)
+
+
+
         action_labelframe = LabelFrame(self.top, text = 'Actions')
         action_labelframe.pack(fill = "both", expand = "yes", side = BOTTOM)
-        b1_button = Button(action_labelframe, text = "B1", command = partial(self.button_callback, GuiActions.LEFT_BUTTON))
-        b1_button.pack(side = LEFT, expand = True)
         left_button = Button(action_labelframe, text = "<", command = partial(self.button_callback, GuiActions.LEFT))
         left_button.pack(side = LEFT, expand = True)
         center_button = Button(action_labelframe, text = "*", command = partial(self.button_callback, GuiActions.ACTION))
         center_button.pack(side = LEFT, expand = True)
         right_button = Button(action_labelframe, text = ">", command = partial(self.button_callback, GuiActions.RIGHT))
         right_button.pack(side = LEFT, expand = True)
-        b2_button = Button(action_labelframe, text = "B2", command = partial(self.button_callback, GuiActions.RIGHT_BUTTON))
-        b2_button.pack(side = LEFT, expand = True)
 
         self.top.protocol("WM_DELETE_WINDOW", self.on_closing)
 
@@ -59,12 +70,41 @@ class TkinterApp(object):
     def check_pipe_poll(self):
         self.logger.debug("check_pipe_poll")
         if self.pipe.poll():
-            pil_image = self.pipe.recv()
-            tk_image = ImageTk.PhotoImage(pil_image)
-            self.image_label.configure(image=tk_image)
-            self.image_label.image = tk_image
+            object  = self.pipe.recv()
+            if isinstance(object, LedPatterns):
+                if object == LedPatterns.NO_LED_ACTIVE:
+                    self.led1.configure(bg="black")
+                    self.led2.configure(bg="black")
+                    self.led3.configure(bg="black")
+                    self.led4.configure(bg="black")
+                    self.led1.configure(bg="black")
+                    self.led2.configure(bg="black")
+                    self.led3.configure(bg="black")
+                    self.led4.configure(bg="black")
+                elif object == LedPatterns.SOLID_GREEN:
+                    self.led1.configure(bg="green")
+                    self.led2.configure(bg="green")
+                    self.led3.configure(bg="green")
+                    self.led4.configure(bg="green")
+                elif object == LedPatterns.SOLID_BLUE:
+                    self.led1.configure(bg="blue")
+                    self.led2.configure(bg="blue")
+                    self.led3.configure(bg="blue")
+                    self.led4.configure(bg="blue")
+                elif object == LedPatterns.SOLID_RED:
+                    self.led1.configure(bg="red")
+                    self.led2.configure(bg="red")
+                    self.led3.configure(bg="red")
+                    self.led4.configure(bg="red")
 
-            self.image_label.pack(side=TOP)
+
+            elif isinstance(object, Image.Image):
+                tk_image = ImageTk.PhotoImage(object)
+                self.image_label.configure(image=tk_image)
+                self.image_label.image = tk_image
+                self.image_label.pack(side=TOP)
+            else:
+                raise Exception("Received unknown object: %s (type: %s)"%(object, type(object)))
         self.top.after(100, self.check_pipe_poll)
 
 class Ssd1306App(Process):
@@ -74,9 +114,9 @@ class Ssd1306App(Process):
         self.logger = logging.getLogger("Ssd1306App")
         self.pipe = pipe
         # Raspberry Pi pin configuration:
-        self.RST = 24
+        self.RST = 14
         # Note the following are only used with SPI:
-        self.DC = 23
+        self.DC = 15
         self.SPI_PORT = 0
         self.SPI_DEVICE = 0
         # 128x64 display with hardware SPI:
@@ -94,9 +134,9 @@ class Ssd1306App(Process):
         GPIO.setwarnings(True)
         GPIO.setmode(GPIO.BCM)        
 
-        self.Enc_A = 2             
-        self.Enc_B = 4             
-        self.Button = 3
+        self.Enc_A = 5            
+        self.Enc_B = 6             
+        self.Button = 13
         
         # Assume that rotary switch is not moving while we init software
         self.Current_A = 1           
@@ -146,33 +186,5 @@ class Ssd1306App(Process):
                 self.disp.image(pil_image)
                 self.disp.display()
             time.sleep(self.update_frequency)
-            
-if __name__ == '__main__':
-    config = configparser.ConfigParser()
-    config.read(r"config.ini")
 
-    logging.config.fileConfig(config, disable_existing_loggers=False)
-    screens.logging.config.fileConfig(config, disable_existing_loggers=False)
-    logger = logging.getLogger(__name__)
-    logger.info("Loaded Logging Configuration")
 
-    parent_conn, child_conn = Pipe()
-
-    controller_process = screens.Controller(child_conn)
-
-    frontend = config['WeightlossGadget']['frontend']
-    if frontend == 'TkInter':
-        tkinter_app = TkinterApp(parent_conn)
-        controller_process.start()
-        tkinter_app.top.mainloop()
-        controller_process.join()
-    elif frontend == 'Ssd1306':
-        import Adafruit_GPIO.SPI as SPI
-        import Adafruit_SSD1306
-        import RPi.GPIO as GPIO
-
-        ssd1306_app = Ssd1306App(parent_conn)
-        ssd1306_app.start()
-        controller_process.start()
-        controller_process.join()
-        ssd1306_app.join()

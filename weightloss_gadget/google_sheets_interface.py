@@ -85,6 +85,20 @@ class GoogleSheetsInterface(object):
         location = CellReference.FromSheetsRange(result.get('range'))
         return (value, location)
 
+    def read_last_updates(self, person):
+        range = "%s!LastUpdates"%person
+        result = self.service.spreadsheets().values().get(
+            spreadsheetId=self.sheet_id,
+            range=range).execute()
+        values = result["values"]
+        dict_result = {entry[0]:entry[1] for entry in values}
+        dict_result["Last Set Day"] = datetime.strptime(dict_result["Last Set Day"], "%Y-%m-%d").date().isoformat() # @TODO: Change to builtin conversion method
+        dict_result["Latest Measured Weight"] = float(dict_result["Latest Measured Weight"])
+        dict_result["Latest Trend Weight"] = float(dict_result["Latest Trend Weight"])
+        dict_result["Latest Variance"] = float(dict_result["Latest Variance"])
+
+        return dict_result
+
     def read_single_cell(self, sheet_id, range):
         result = self.service.spreadsheets().values().get(
             spreadsheetId=sheet_id,
@@ -98,8 +112,8 @@ class GoogleSheetsInterface(object):
         else:
             return None
 
-    def read_startdate(self):
-        startdate_range_name = "StartDate"
+    def read_startdate(self, person):
+        startdate_range_name = "%s!StartDate"%person
 
         iso_string = self.read_single_cell(self.sheet_id, startdate_range_name)
         startdate = self.convert_iso_string_to_date(iso_string)
@@ -118,15 +132,15 @@ class GoogleSheetsInterface(object):
         else:
             return None
 
-    def read_last_saved_weight(self, datetime_object = date.today()):
-        start_date_string, start_date_reference = self.read_named_range_value_and_location("StartDate")
+    def read_last_saved_weight(self, person, datetime_object = date.today()):
+        start_date_string, start_date_reference = self.read_named_range_value_and_location("%s!StartDate"%person)
         start_date = self.convert_iso_string_to_date(start_date_string)
         offset_days = (datetime_object - start_date).days
 
         current_date_reference = start_date_reference.add_delta(row_delta=offset_days)
         value = None
         while current_date_reference.row_nbr >= start_date_reference.row_nbr and value is None:
-            row = self.read_row(current_date_reference.row_nbr)
+            row = self.read_row(person, current_date_reference.row_nbr)
             row['Weight in kg'] = self.convert_string_to_float(row['Weight in kg'])
             row['Trend'] = self.convert_string_to_float(row['Trend'])
             row['Variance'] = self.convert_string_to_float(row['Variance'])
@@ -135,11 +149,11 @@ class GoogleSheetsInterface(object):
 
         return row
 
-    def read_row(self, row):
+    def read_row(self, person, row):
         if self.header_columns is None:
-            self.collect_header_columns()
+            self.collect_header_columns(person)
 
-        current_row_cell = CellReference(sheet_name='InputData',column_nbr=1,row_nbr=row)
+        current_row_cell = CellReference(sheet_name=person, column_nbr=1,row_nbr=row)
         row = {}
         for header_column in self.header_columns:
             value = self.read_single_cell(self.sheet_id, current_row_cell.sheets_range)
@@ -148,11 +162,18 @@ class GoogleSheetsInterface(object):
 
         return row
 
-    def read_row_for_date(self, datetime_object):
-        if self.header_columns is None:
-            self.collect_header_columns()
+    def read_weight_row(self, person, row):
+        raw_row = self.read_row(person, row)
+        raw_row['Weight in kg'] = float(raw_row['Weight in kg'])
+        raw_row['Trend'] = float(raw_row['Trend'])
+        raw_row['Variance'] = float(raw_row['Variance'])
+        return raw_row
 
-        start_date_string, start_date_reference = self.read_named_range_value_and_location("StartDate")
+    def read_row_for_date(self, person, datetime_object):
+        if self.header_columns is None:
+            self.collect_header_columns(person)
+
+        start_date_string, start_date_reference = self.read_named_range_value_and_location("%s!StartDate"%person)
         start_date = self.convert_iso_string_to_date(start_date_string)
         offset_days = (datetime_object - start_date).days
 
@@ -165,17 +186,37 @@ class GoogleSheetsInterface(object):
 
         return row
 
-    def write_weight(self, weight, datetime_object = date.today()):
+    def collect_header_columns(self, person):
+        current_header_cell = CellReference(person, 1, 1)
+        self.header_columns = []
+        look_at_next_cell = True
+        while look_at_next_cell:
+            header_column = self.read_single_cell(self.sheet_id, current_header_cell.sheets_range)
+            if header_column:
+                self.header_columns.append(header_column)
+                current_header_cell = current_header_cell.add_delta(column_delta=1)
+            else:
+                look_at_next_cell = False
+
+    def write_weight(self, person, weight, date_object = date.today()):
+        if isinstance(date_object, str):
+            date_object = self.convert_iso_string_to_date(date_object)
+        start_date_string, start_date_reference = self.read_named_range_value_and_location("%s!StartDate" % person)
+        start_date = self.convert_iso_string_to_date(start_date_string)
+        offset_days = (date_object - start_date).days
+
+        current_date_reference = start_date_reference.add_delta(row_delta=offset_days, column_delta=2)
+
         values = [
             [
-                weight # Cell values
+                weight  # Cell values
             ],
             # Additional rows
         ]
 
         data = [
             {
-                'range': 'InputData!F2',
+                'range': current_date_reference.sheets_range,
                 'values': values
             },
             # Additional ranges to update ...
@@ -187,16 +228,3 @@ class GoogleSheetsInterface(object):
         }
         result = self.service.spreadsheets().values().batchUpdate(
             spreadsheetId=self.sheet_id, body=body).execute()
-
-    def collect_header_columns(self):
-        current_header_cell = CellReference('InputData', 1, 1)
-        self.header_columns = []
-        look_at_next_cell = True
-        while look_at_next_cell:
-            header_column = self.read_single_cell(self.sheet_id, current_header_cell.sheets_range)
-            if header_column:
-                self.header_columns.append(header_column)
-                current_header_cell = current_header_cell.add_delta(column_delta=1)
-            else:
-                look_at_next_cell = False
-
