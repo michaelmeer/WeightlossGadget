@@ -10,7 +10,6 @@ from multiprocessing import Process, Pipe
 from PIL import Image, ImageTk
 
 from weightloss_gadget.gui_actions import GuiActions
-from weightloss_gadget.led_patterns import LedPatterns
 
 
 class TkinterApp(object):
@@ -45,7 +44,7 @@ class TkinterApp(object):
         self.led8 = Canvas(leds_labelframe, bg = "yellow", height = 50, width = 50)
         self.led8.pack(side=LEFT)
 
-
+        self.leds = [self.led1, self.led2, self.led3, self.led4, self.led5, self.led6, self.led7, self.led8]
 
         action_labelframe = LabelFrame(self.top, text = 'Actions')
         action_labelframe.pack(fill = "both", expand = "yes", side = BOTTOM)
@@ -71,38 +70,14 @@ class TkinterApp(object):
         self.logger.debug("check_pipe_poll")
         if self.pipe.poll():
             object  = self.pipe.recv()
-            if isinstance(object, LedPatterns):
-                if object == LedPatterns.NO_LED_ACTIVE:
-                    self.led1.configure(bg="black")
-                    self.led2.configure(bg="black")
-                    self.led3.configure(bg="black")
-                    self.led4.configure(bg="black")
-                    self.led1.configure(bg="black")
-                    self.led2.configure(bg="black")
-                    self.led3.configure(bg="black")
-                    self.led4.configure(bg="black")
-                elif object == LedPatterns.SOLID_GREEN:
-                    self.led1.configure(bg="green")
-                    self.led2.configure(bg="green")
-                    self.led3.configure(bg="green")
-                    self.led4.configure(bg="green")
-                elif object == LedPatterns.SOLID_BLUE:
-                    self.led1.configure(bg="blue")
-                    self.led2.configure(bg="blue")
-                    self.led3.configure(bg="blue")
-                    self.led4.configure(bg="blue")
-                elif object == LedPatterns.SOLID_RED:
-                    self.led1.configure(bg="red")
-                    self.led2.configure(bg="red")
-                    self.led3.configure(bg="red")
-                    self.led4.configure(bg="red")
-
-
-            elif isinstance(object, Image.Image):
+            if isinstance(object, Image.Image):
                 tk_image = ImageTk.PhotoImage(object)
                 self.image_label.configure(image=tk_image)
                 self.image_label.image = tk_image
                 self.image_label.pack(side=TOP)
+            elif isinstance(object, list):
+                for led_widget, led_state in zip(self.leds, object):
+                    led_widget.configure(bg=str(led_state))
             else:
                 raise Exception("Received unknown object: %s (type: %s)"%(object, type(object)))
         self.top.after(100, self.check_pipe_poll)

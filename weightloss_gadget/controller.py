@@ -18,10 +18,14 @@ class Controller(Process):
 
         self.screens = self.setup_screens_from_config()
         self.update_frequency = 0.1
+        self.rotate_screen = self.config.getboolean('weightloss_gadget', 'rotate_screen', fallback=False)
+
+        self.led_pattern = None
 
         self.logger.info("Controller initialized")
 
-    def available_screen_classes(self):
+    @staticmethod
+    def available_screen_classes():
         screen_classes = screens.AbstractScreen.__subclasses__()
         screen_classes_dictionary = {screen_class.__name__:screen_class for screen_class in screen_classes}
         return screen_classes_dictionary
@@ -36,7 +40,7 @@ class Controller(Process):
             if possible_screen_class_name and possible_screen_class_name in available_screen_classes:
                 self.logger.info("Initiating screen instance of type %s", section_name)
                 screen_class = available_screen_classes[possible_screen_class_name]
-                screen_instance = screen_class(self.config[section_name])
+                screen_instance = screen_class(self, self.config[section_name])
                 screen_instances.append(screen_instance)
 
         return screen_instances
@@ -61,8 +65,10 @@ class Controller(Process):
                 picture = self.get_current_screen().create_image()
                 self.send_picture_to_controller(picture)
 
-                led_pattern = self.get_current_screen().create_led_pattern()
-                self.pipe.send(led_pattern)
+            if self.is_led_pattern_set() and self.led_pattern.does_need_update():
+                current_leds_state = self.led_pattern.create_led_pattern()
+                self.send_leds_state_to_controller(current_leds_state)
+                self.logger.debug("current_leds_state: {}", current_leds_state)
 
             if self.pipe.poll():
                 received_object = self.pipe.recv()
@@ -80,12 +86,16 @@ class Controller(Process):
                     elif received_object.value == GuiActions.ACTION.value:
                         if self.get_current_screen().handles_input():
                             self.get_current_screen().set_input_mode(not self.get_current_screen().input_mode)
+
             time.sleep(self.update_frequency)
 
     def send_picture_to_controller(self, picture):
-        if self.config.getboolean('weightloss_gadget', 'rotate_screen', fallback=False):
+        if self.rotate_screen:
             picture = picture.rotate(180)
         self.pipe.send(picture)
+
+    def send_leds_state_to_controller(self, leds_state):
+        self.pipe.send(leds_state)
 
     def get_current_screen(self):
         if not hasattr(self, "current_screen_index"):
@@ -107,13 +117,25 @@ class Controller(Process):
 
         picture = self.get_current_screen().create_image()
         self.send_picture_to_controller(picture)
+        if self.led_pattern:
+            self.led_pattern.stop()
+            self.send_leds_state_to_controller(self.led_pattern.end_led_pattern())
+            self.led_pattern = None
+
+    def is_led_pattern_set(self):
+        return self.led_pattern is not None
+
+    def set_led_pattern(self, led_pattern_class):
+        if led_pattern_class:
+            self.led_pattern = led_pattern_class()
+        else:
+            self.led_pattern = None
 
 def main():
     config = configparser.ConfigParser()
     config.read(r"../config.ini") # @TODO: find the correct file once this is all packaged nicely
 
     logging.config.fileConfig(config, disable_existing_loggers=False)
-    #screens.logging.config.fileConfig(config, disable_existing_loggers=False)
     logger = logging.getLogger(__name__)
     logger.info("Loaded Logging Configuration")
 

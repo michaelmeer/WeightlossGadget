@@ -10,28 +10,29 @@ from PIL import Image, ImageDraw, ImageFont
 
 from weightloss_gadget import google_sheets_interface
 from weightloss_gadget.gui_actions import GuiActions
-from weightloss_gadget.led_patterns import LedPatterns
+import weightloss_gadget.led_patterns as led_patterns
 
 SCREEN_WIDTH = 128
 SCREEN_HEIGHT = 64
-"""
-Fill 0 -> black, 1 -> white
-"""
 
-interface = google_sheets_interface.GoogleSheetsInterface(
-    client_secret_file=r'C:\Users\michael.meer\PycharmProjects\WeightlossGadget\client_secret_1082141044520-n0cg7u76fd8pvvagh929o91538u1val1.apps.googleusercontent.com.json',
-    application_name='dailycalories',
-    sheet_id='1VHbeWIq21ib7MndwwCHRon52of1MI4z9RVproZ_kpCk'
-)
+
+# interface = google_sheets_interface.GoogleSheetsInterface(
+#     client_secret_file=r'C:\Users\michael.meer\PycharmProjects\WeightlossGadget\client_secret_1082141044520-n0cg7u76fd8pvvagh929o91538u1val1.apps.googleusercontent.com.json',
+#     application_name='dailycalories',
+#     sheet_id='1VHbeWIq21ib7MndwwCHRon52of1MI4z9RVproZ_kpCk'
+# )
 
 fnt = ImageFont.truetype(r'../resources/Roboto-Bold.ttf', 14)
+
 
 class Color(Enum):
     BLACK = 0
     WHITE = 1
 
+
 class AbstractScreen(object):
-    def __init__(self, config):
+    def __init__(self, controller, config):
+        self.controller = controller
         self.config = config
         self.get_logger()
 
@@ -53,21 +54,17 @@ class AbstractScreen(object):
     def does_need_update(self):
         return False
 
-    def create_led_pattern(self):
-        return LedPatterns.NO_LED_ACTIVE
 
 class WatchScreen(AbstractScreen):
-    def __init__(self, config):
-        super().__init__(config)
-        self.update_frequency = 0.5
+    def __init__(self, controller, config):
+        super().__init__(controller, config)
         self.counter = 0
 
     def does_need_update(self):
+        if not self.controller.is_led_pattern_set():
+            self.controller.set_led_pattern(led_patterns.red_blinking_pattern)
         self.counter += 1
         return self.counter % 5 == 0
-
-    def create_led_pattern(self):
-        return LedPatterns.SOLID_BLUE
 
     def create_image(self):
         im = Image.new('1', (SCREEN_WIDTH, SCREEN_HEIGHT), 128)
@@ -86,17 +83,13 @@ class WatchScreen(AbstractScreen):
         return im
 
 class IpAddressScreen(AbstractScreen):
-    def __init__(self, config):
-        super().__init__(config)
-        self.update_frequency = 0.5
+    def __init__(self, controller, config):
+        super().__init__(controller, config)
         self.counter = 0
        
     def does_need_update(self):
         self.counter += 1
         return self.counter <= 1
-
-    def create_led_pattern(self):
-        return LedPatterns.SOLID_GREEN
 
     def create_image(self):
         im = Image.new('1', (SCREEN_WIDTH, SCREEN_HEIGHT), color = 0)
@@ -109,6 +102,7 @@ class IpAddressScreen(AbstractScreen):
         del draw
         return im
 
+
 class WeatherScreen(AbstractScreen):
     zip_code_query_template = "http://api.openweathermap.org/data/2.5/weather?appid={API_KEY}&zip={zip_code},{country_code}&units=metric"
 
@@ -117,8 +111,8 @@ class WeatherScreen(AbstractScreen):
     https://erikflowers.github.io/weather-icons/
     
     """
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, controller, config):
+        super().__init__(controller, config)
         self.api_key = self.config['api_key']
         self.zip_code = self.config['zip_code']
         self.country_code = self.config['country_code']
@@ -158,8 +152,8 @@ class WeatherScreen(AbstractScreen):
 
 
 class WeightChartScreen(AbstractScreen):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, controller, config):
+        super().__init__(controller, config)
         self.data_points = [66.6,
             66.5,
             66.4,
@@ -229,6 +223,7 @@ class WeightChartScreen(AbstractScreen):
         del draw
         return im
 
+
 class WeightInputScreen(AbstractScreen):
     """
     Here's what should be shown in the initial version
@@ -246,8 +241,8 @@ class WeightInputScreen(AbstractScreen):
     - Blinking Weight
     
     """
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, controller, config):
+        super().__init__(controller, config)
         self.person = self.config['person']
         self.update_frequency = 0.5
         self.counter = 0
@@ -283,7 +278,7 @@ class WeightInputScreen(AbstractScreen):
             im = Image.new('1', (SCREEN_WIDTH, SCREEN_HEIGHT), color=BG)
             draw = ImageDraw.Draw(im)
             draw.text((0, 0), self.person, font=fnt, fill=FG)
-            weight_str ="Weight: %5.1f"%self.current_weight
+            weight_str = "Weight: %5.1f"%self.current_weight
             self.logger.debug("Counter: %i", self.counter)
             if self.input_mode and self.counter%3 == 0:
                 weight_str = weight_str[:-1]+' '
